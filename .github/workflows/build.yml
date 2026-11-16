@@ -13,4 +13,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: crazygames-build
-          path: build/
+          path: dist/
