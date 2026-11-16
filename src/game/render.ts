@@ -135,7 +135,7 @@ function drawEnt(ctx: CanvasRenderingContext2D, e: Ent, t: number) {
   const sa = e.angle + sw;
   ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(sa);
   ctx.fillStyle = "#4a3320"; ctx.fillRect(12, -3, 10, 6);
-  ctx.fillStyle = SWORD_COL[e.sword]; ctx.fillRect(20, -3.5, 30 + e.sword * 4, 7);
+  ctx.fillStyle = SWORD_COL[e.sword]!; ctx.fillRect(20, -3.5, 30 + e.sword * 4, 7);
   ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.fillRect(20, -3.5, 30 + e.sword * 4, 2);
   ctx.restore();
   if (e.swingT > 0) {

@@ -94,7 +94,7 @@ export class Game {
     this.ents = [];
     const roles: Ent["role"][] = ["attacker", "defender", "collector"];
     (["red", "blue"] as Team[]).forEach((team) => {
-      for (let i = 0; i < 3; i++) this.ents.push(this.makeEnt(team, NAMES[team][i], team === "red" && i === 0, roles[i], i));
+      for (let i = 0; i < 3; i++) this.ents.push(this.makeEnt(team, NAMES[team][i]!, team === "red" && i === 0, roles[i]!, i));
     });
   }
 
@@ -167,7 +167,7 @@ export class Game {
   // ---- combat ----
   damage(t: Ent, raw: number, from: Ent) {
     if (!t.alive) return;
-    const dmg = raw * (1 - ARMORS[t.armor].reduce);
+    const dmg = raw * (1 - ARMORS[t.armor]!.reduce);
     t.hp -= dmg; t.hitFlash = 0.15;
     const a = Math.atan2(t.y - from.y, t.x - from.x);
     t.kbx += Math.cos(a) * 380; t.kby += Math.sin(a) * 380;
@@ -191,7 +191,7 @@ export class Game {
 
   private swing(e: Ent) {
     e.swingCd = e.isPlayer ? SWING_CD : BOT_SWING_CD; e.swingT = 0.18;
-    const dmg = SWORDS[e.sword].dmg;
+    const dmg = SWORDS[e.sword]!.dmg;
     for (const o of this.ents) {
       if (!o.alive || o.team === e.team) continue;
       const d = dist(e.x, e.y, o.x, o.y);
@@ -302,8 +302,8 @@ export class Game {
 
   // ---- bot AI ----
   private think(b: Ent, dt: number): [number, number, boolean] {
-    if (b.sword < 2 && b.gold >= SWORDS[b.sword + 1].cost) this.buy(b, "sword");
-    else if (b.armor < 2 && b.gold >= ARMORS[b.armor + 1].cost) this.buy(b, "armor");
+    if (b.sword < 2 && b.gold >= SWORDS[b.sword + 1]!.cost) this.buy(b, "sword");
+    else if (b.armor < 2 && b.gold >= ARMORS[b.armor + 1]!.cost) this.buy(b, "armor");
     if (b.hp < 40 && b.gold >= POTION.cost + 10) this.buy(b, "potion");
 
     const myFlag = this.flags[b.team], enFlag = this.flags[other(b.team)];

@@ -26,7 +26,7 @@ describe("flag wars rules", () => {
   });
   it("diamond armor cuts damage by 45%", () => {
     const g = new Game();
-    const [a, , , b] = g.ents;
+    const a = g.ents[0]!, b = g.ents[3]!;
     b.armor = 2;
     g.damage(b, 100 / 1, a);
     expect(b.hp).toBeCloseTo(100 - 55);

@@ -120,8 +120,8 @@ export function GameView() {
         <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
           <span className="font-display text-base text-gold">⛃ {hud.gold} gold</span>
           <span className="text-right">▦ {hud.blocks} blocks</span>
-          <span>{SWORDS[hud.sword].name}</span>
-          <span className="text-right">{ARMORS[hud.armor].name}</span>
+          <span>{SWORDS[hud.sword]!.name}</span>
+          <span className="text-right">{ARMORS[hud.armor]!.name}</span>
         </div>
         <button className="block-btn mt-2 w-full py-1 text-sm" onClick={() => setShop((s) => !s)}>Shop (B)</button>
       </div>
@@ -149,8 +149,8 @@ export function GameView() {
             <span className="font-display text-gold">⛃ {hud.gold}</span>
           </div>
           {[
-            { key: "sword" as const, n: 1, label: SWORDS[hud.sword + 1]?.name ?? "Max sword", cost: SWORDS[hud.sword + 1]?.cost, sub: SWORDS[hud.sword + 1] ? `${SWORDS[hud.sword + 1].dmg} damage` : "Maxed" },
-            { key: "armor" as const, n: 2, label: ARMORS[hud.armor + 1]?.name ?? "Max armor", cost: ARMORS[hud.armor + 1]?.cost, sub: ARMORS[hud.armor + 1] ? `-${ARMORS[hud.armor + 1].reduce * 100}% damage taken` : "Maxed" },
+            { key: "sword" as const, n: 1, label: SWORDS[hud.sword + 1]?.name ?? "Max sword", cost: SWORDS[hud.sword + 1]?.cost, sub: SWORDS[hud.sword + 1] ? `${SWORDS[hud.sword + 1]!.dmg} damage` : "Maxed" },
+            { key: "armor" as const, n: 2, label: ARMORS[hud.armor + 1]?.name ?? "Max armor", cost: ARMORS[hud.armor + 1]?.cost, sub: ARMORS[hud.armor + 1] ? `-${ARMORS[hud.armor + 1]!.reduce * 100}% damage taken` : "Maxed" },
             { key: "blocks" as const, n: 3, label: `${BLOCK_PACK.count} Wall blocks`, cost: BLOCK_PACK.cost, sub: "Right-click to build" },
             { key: "potion" as const, n: 4, label: "Health potion", cost: POTION.cost, sub: `+${POTION.heal} HP` },
           ].map((it) => (
