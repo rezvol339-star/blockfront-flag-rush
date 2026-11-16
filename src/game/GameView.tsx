@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
+import { Canvas } from "@react-three/fiber";
+import * as THREE from "three";
 import { ARMORS, BLOCK_PACK, Game, MAX_HP, POTION, SWORDS, WIN_SCORE, type Team } from "./engine";
-import { computeCam, render } from "./render";
+import { Scene, type Controls } from "./Scene";
 
 type Hud = {
   score: Record<Team, number>; time: number; hp: number; gold: number; sword: number; armor: number; blocks: number;
   alive: boolean; respawn: number; carrying: boolean; over: boolean; winner: Team | "draw" | null;
   feed: { text: string; team: Team }[]; kills: number;
 };
-
 const snap = (g: Game): Hud => {
   const p = g.player;
   return {
@@ -16,87 +17,82 @@ const snap = (g: Game): Hud => {
     feed: g.feed.map((f) => ({ text: f.text, team: f.team })), kills: p.kills,
   };
 };
+const MOUSE_SENS = 0.0025, KEY_TURN = 2.4, PLACE_DIST = 70;
 
 export function GameView() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Game>(new Game());
+  const ctl = useRef<Controls>({ keys: new Set(), yaw: 0, pitch: 0.38, attack: false, started: false }).current;
   const [hud, setHud] = useState<Hud>(() => snap(gameRef.current));
   const [started, setStarted] = useState(false);
   const [shop, setShop] = useState(false);
-  const startedRef = useRef(false);
-  startedRef.current = started;
+  const [locked, setLocked] = useState(false);
+  ctl.started = started && !hud.over;
 
   const buy = (item: "sword" | "armor" | "blocks" | "potion") => { gameRef.current.buy(gameRef.current.player, item); setHud(snap(gameRef.current)); };
-  const restart = () => { gameRef.current.reset(); setHud(snap(gameRef.current)); setStarted(true); };
+  const lock = () => { const c = wrapRef.current?.querySelector("canvas"); try { void c?.requestPointerLock?.(); } catch { /* not allowed */ } };
+  const restart = () => { gameRef.current.reset(); ctl.yaw = 0; setHud(snap(gameRef.current)); setStarted(true); setShop(false); lock(); };
+  const place = () => {
+    const g = gameRef.current, p = g.player;
+    g.placeBlock(p, p.x + Math.cos(ctl.yaw) * PLACE_DIST, p.y + Math.sin(ctl.yaw) * PLACE_DIST);
+  };
 
   useEffect(() => {
-    const canvas = canvasRef.current!, ctx = canvas.getContext("2d")!;
-    const keys = new Set<string>();
-    const mouse = { sx: 0, sy: 0, x: 0, y: 0, down: false };
-    let cam = { x: 0, y: 0, scale: 1 };
-    let raf = 0, last = performance.now(), hudT = 0, ready = false;
-    const resize = () => {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      canvas.width = canvas.clientWidth * dpr; canvas.height = canvas.clientHeight * dpr;
-    };
-    resize();
-    const onKey = (e: KeyboardEvent, down: boolean) => {
+    const kd = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
-      if (down) {
-        if (k === "b") setShop((s) => !s);
-        if (k === "1") buy("sword"); if (k === "2") buy("armor"); if (k === "3") buy("blocks"); if (k === "4") buy("potion");
-        if (k === " ") e.preventDefault();
-        keys.add(k);
-      } else keys.delete(k);
+      if (k === "b") setShop((s) => !s);
+      if (k === "1") buy("sword"); if (k === "2") buy("armor"); if (k === "3") buy("blocks"); if (k === "4") buy("potion");
+      if (k === "f") place();
+      if (k === " " || k.startsWith("arrow")) e.preventDefault();
+      ctl.keys.add(k);
     };
-    const kd = (e: KeyboardEvent) => onKey(e, true), ku = (e: KeyboardEvent) => onKey(e, false);
-    const mm = (e: MouseEvent) => { const r = canvas.getBoundingClientRect(); mouse.sx = e.clientX - r.left; mouse.sy = e.clientY - r.top; };
-    const md = (e: MouseEvent) => {
-      mm(e);
-      if (e.button === 0) mouse.down = true;
-      if (e.button === 2) gameRef.current.placeBlock(gameRef.current.player, mouse.x, mouse.y);
-    };
-    const mu = (e: MouseEvent) => { if (e.button === 0) mouse.down = false; };
-    const cm = (e: Event) => e.preventDefault();
-    window.addEventListener("keydown", kd); window.addEventListener("keyup", ku);
-    window.addEventListener("resize", resize);
-    canvas.addEventListener("mousemove", mm); canvas.addEventListener("mousedown", md);
-    window.addEventListener("mouseup", mu); canvas.addEventListener("contextmenu", cm);
-
-    const loop = (now: number) => {
-      const dt = Math.min((now - last) / 1000, 0.05); last = now;
-      const g = gameRef.current;
-      const cw = canvas.clientWidth, ch = canvas.clientHeight, dpr = canvas.width / Math.max(1, cw);
-      cam = computeCam(g, cw, ch);
-      mouse.x = mouse.sx / cam.scale + cam.x; mouse.y = mouse.sy / cam.scale + cam.y;
-      if (startedRef.current) {
-        const dx = (keys.has("d") || keys.has("arrowright") ? 1 : 0) - (keys.has("a") || keys.has("arrowleft") ? 1 : 0);
-        const dy = (keys.has("s") || keys.has("arrowdown") ? 1 : 0) - (keys.has("w") || keys.has("arrowup") ? 1 : 0);
-        g.step(dt, { dx, dy, aimX: mouse.x, aimY: mouse.y, attack: mouse.down || keys.has(" ") });
+    const ku = (e: KeyboardEvent) => ctl.keys.delete(e.key.toLowerCase());
+    const mm = (e: MouseEvent) => {
+      if (document.pointerLockElement || (e.buttons & 2)) {
+        ctl.yaw += e.movementX * MOUSE_SENS;
+        ctl.pitch = Math.max(0.1, Math.min(1.1, ctl.pitch + e.movementY * MOUSE_SENS));
       }
-      render(ctx, g, cam, dpr, cw, ch, mouse, now / 1000);
-      if (!ready) { ready = true; wrapRef.current?.setAttribute("data-scene-ready", "true"); }
-      hudT -= dt;
-      if (hudT <= 0) { hudT = 0.1; setHud(snap(g)); }
-      raf = requestAnimationFrame(loop);
     };
-    raf = requestAnimationFrame(loop);
+    const onLock = () => setLocked(!!document.pointerLockElement);
+    let raf = 0, last = performance.now(), hudT = 0;
+    const tick = (now: number) => {
+      const dt = Math.min((now - last) / 1000, 0.05); last = now;
+      if (ctl.keys.has("q")) ctl.yaw -= KEY_TURN * dt;
+      if (ctl.keys.has("e")) ctl.yaw += KEY_TURN * dt;
+      hudT -= dt; if (hudT <= 0) { hudT = 0.1; setHud(snap(gameRef.current)); }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    window.addEventListener("keydown", kd); window.addEventListener("keyup", ku);
+    window.addEventListener("mousemove", mm); document.addEventListener("pointerlockchange", onLock);
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku); window.removeEventListener("resize", resize);
-      window.removeEventListener("mouseup", mu);
+      window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku);
+      window.removeEventListener("mousemove", mm); document.removeEventListener("pointerlockchange", onLock);
     };
   }, []);
 
   const mins = Math.max(0, Math.floor(hud.time / 60)), secs = Math.max(0, Math.floor(hud.time % 60));
   return (
-    <div ref={wrapRef} className="relative h-screen w-screen select-none overflow-hidden bg-background font-sans text-foreground">
-      <canvas ref={canvasRef} className="block h-full w-full cursor-crosshair" />
+    <div ref={wrapRef} className="relative h-screen w-screen select-none overflow-hidden bg-background font-sans text-foreground"
+      onContextMenu={(e) => e.preventDefault()}>
+      <Canvas shadows dpr={[1, 1.5]} camera={{ fov: 60, near: 0.1, far: 120, position: [0, 8, 12] }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
+        className="!absolute inset-0"
+        onPointerDown={(e) => {
+          if (!ctl.started) return;
+          if (!document.pointerLockElement && e.button === 0) lock();
+          if (e.button === 0) ctl.attack = true;
+          if (e.button === 2 && document.pointerLockElement) place();
+        }}
+        onPointerUp={(e) => { if (e.button === 0) ctl.attack = false; }}>
+        <Scene game={gameRef} ctl={ctl} onReady={() => wrapRef.current?.setAttribute("data-scene-ready", "true")} />
+      </Canvas>
 
-      {/* Score */}
+      {started && locked && <div className="pointer-events-none absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-border bg-foreground" />}
+
       <div className="pointer-events-none absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-3">
-        <div className="block-panel flex items-center gap-2 bg-team-red px-4 py-1 font-display text-3xl text-outline">{hud.score.red}</div>
+        <div className="block-panel bg-team-red px-4 py-1 font-display text-3xl text-outline">{hud.score.red}</div>
         <div className="block-panel px-3 py-1 text-center font-display">
           <div className="text-xl text-gold text-outline">{mins}:{secs.toString().padStart(2, "0")}</div>
           <div className="text-[10px] uppercase tracking-widest text-muted-foreground">First to {WIN_SCORE}</div>
@@ -104,15 +100,13 @@ export function GameView() {
         <div className="block-panel bg-team-blue px-4 py-1 font-display text-3xl text-outline">{hud.score.blue}</div>
       </div>
 
-      {/* Kill feed */}
       <div className="pointer-events-none absolute right-3 top-3 flex w-72 flex-col items-end gap-1">
         {hud.feed.map((f, i) => (
           <div key={i} className={`block-panel px-2 py-0.5 text-xs font-bold ${f.team === "red" ? "text-team-red" : "text-team-blue"}`}>{f.text}</div>
         ))}
       </div>
 
-      {/* Player stats */}
-      <div className="block-panel pointer-events-auto absolute bottom-3 left-3 w-72 p-3">
+      <div className="block-panel absolute bottom-3 left-3 w-64 p-3">
         <div className="mb-1 flex justify-between font-display text-sm"><span>HP</span><span>{Math.ceil(hud.hp)}/{MAX_HP}</span></div>
         <div className="h-3 overflow-hidden rounded-sm border-2 border-border bg-muted">
           <div className="h-full bg-team-red transition-all" style={{ width: `${(hud.hp / MAX_HP) * 100}%` }} />
@@ -127,23 +121,22 @@ export function GameView() {
       </div>
 
       <div className="pointer-events-none absolute bottom-3 right-3 block-panel px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
-        <b className="text-foreground">WASD</b> move · <b className="text-foreground">Left click</b> sword · <b className="text-foreground">Right click</b> place block<br />
-        <b className="text-foreground">B</b> shop · <b className="text-foreground">1–4</b> quick-buy · stand on <span className="text-gold">gold zones</span> to mine
+        <b className="text-foreground">WASD</b> move · <b className="text-foreground">Mouse</b> look · <b className="text-foreground">Click</b> swing<br />
+        <b className="text-foreground">Right click / F</b> place block · <b className="text-foreground">Q/E</b> turn · <b className="text-foreground">B</b> shop · <b className="text-foreground">Esc</b> free mouse
       </div>
 
-      {hud.carrying && (
-        <div className="pointer-events-none absolute left-1/2 top-24 -translate-x-1/2 animate-pulse font-display text-2xl text-gold text-outline">
-          You have the flag! Run home!
-        </div>
-      )}
+      {hud.carrying && <div className="pointer-events-none absolute left-1/2 top-24 -translate-x-1/2 animate-pulse font-display text-2xl text-gold text-outline">You have the flag! Run home!</div>}
       {started && !hud.alive && !hud.over && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="font-display text-5xl text-outline">Respawning in {Math.ceil(hud.respawn)}…</div>
         </div>
       )}
+      {started && !locked && !hud.over && !shop && (
+        <div className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 block-panel px-4 py-2 font-display text-lg">Click the arena to control the camera</div>
+      )}
 
       {shop && started && (
-        <div className="block-panel absolute left-3 top-20 w-72 p-4 max-h-[calc(100vh-15rem)] overflow-y-auto">
+        <div className="block-panel absolute left-3 top-20 max-h-[calc(100vh-15rem)] w-72 overflow-y-auto p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-display text-2xl text-gold text-outline">Shop</h2>
             <span className="font-display text-gold">⛃ {hud.gold}</span>
@@ -164,7 +157,7 @@ export function GameView() {
       )}
 
       {(!started || hud.over) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/70 backdrop-blur-sm">
+        <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm">
           <div className="block-panel max-w-md p-8 text-center">
             {hud.over ? (
               <>
