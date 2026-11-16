@@ -28,3 +28,5 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+- Game rules live in src/game/engine.ts (plain TS, no React/DOM) and are unit-tested; render.ts only draws state, GameView.tsx owns input/HUD. Why: keeps rules testable as the game grows.

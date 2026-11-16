@@ -62,6 +62,12 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --font-display: "Lilita One", system-ui, sans-serif;
+  --font-sans: "Nunito", system-ui, sans-serif;
+  --color-team-red: var(--team-red);
+  --color-team-blue: var(--team-blue);
+  --color-gold: var(--gold);
+  --color-panel: var(--panel);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -73,26 +79,30 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --radius: 0.5rem;
+  --background: oklch(0.24 0.03 150);
+  --foreground: oklch(0.97 0.01 100);
+  --card: oklch(0.2 0.03 160);
+  --card-foreground: oklch(0.97 0.01 100);
+  --popover: oklch(0.2 0.03 160);
+  --popover-foreground: oklch(0.97 0.01 100);
+  --primary: oklch(0.86 0.17 90);
+  --primary-foreground: oklch(0.22 0.04 70);
+  --secondary: oklch(0.32 0.03 160);
+  --secondary-foreground: oklch(0.97 0.01 100);
+  --muted: oklch(0.3 0.02 160);
+  --muted-foreground: oklch(0.78 0.02 120);
+  --accent: oklch(0.36 0.04 160);
+  --accent-foreground: oklch(0.97 0.01 100);
+  --destructive: oklch(0.62 0.21 27);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.12 0.02 160);
+  --input: oklch(0.35 0.03 160);
+  --ring: oklch(0.86 0.17 90);
+  --team-red: oklch(0.62 0.2 28);
+  --team-blue: oklch(0.6 0.16 250);
+  --gold: oklch(0.88 0.16 92);
+  --panel: oklch(0.18 0.02 160 / 0.88);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -152,4 +162,26 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+}
+
+@layer components {
+  .block-panel {
+    background: var(--panel);
+    border: 3px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 5px 0 var(--border), inset 0 2px 0 oklch(1 0 0 / 0.08);
+  }
+  .block-btn {
+    font-family: var(--font-display);
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border: 3px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 0 var(--border), inset 0 -4px 0 oklch(0 0 0 / 0.18);
+    transition: transform 0.08s;
+  }
+  .block-btn:hover { transform: translateY(-1px); }
+  .block-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--border); }
+  .block-btn:disabled { opacity: 0.45; transform: none; }
+  .text-outline { text-shadow: 0 3px 0 var(--border), 0 0 2px var(--border); }
 }
