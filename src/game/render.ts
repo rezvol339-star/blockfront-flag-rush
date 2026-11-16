@@ -38,7 +38,7 @@ function getGround() {
 export interface Cam { x: number; y: number; scale: number }
 
 export function computeCam(game: Game, cw: number, ch: number): Cam {
-  const scale = Math.max(0.55, Math.min(1.2, ch / 820, cw / 1100));
+  const scale = Math.max(0.5, Math.min(1.1, ch / 950, cw / 1300));
   const vw = cw / scale, vh = ch / scale;
   const p = game.player;
   const x = vw >= W ? (W - vw) / 2 : Math.max(0, Math.min(W - vw, p.x - vw / 2));

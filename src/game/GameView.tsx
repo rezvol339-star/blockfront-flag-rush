@@ -143,7 +143,7 @@ export function GameView() {
       )}
 
       {shop && started && (
-        <div className="block-panel absolute left-3 top-1/2 w-72 -translate-y-1/2 p-4">
+        <div className="block-panel absolute left-3 top-20 w-72 p-4 max-h-[calc(100vh-15rem)] overflow-y-auto">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-display text-2xl text-gold text-outline">Shop</h2>
             <span className="font-display text-gold">⛃ {hud.gold}</span>
