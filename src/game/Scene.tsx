@@ -25,7 +25,7 @@ function Stepper({ game, ctl }: { game: MutableRefObject<Game>; ctl: Controls })
       const f = (k.has("w") || k.has("arrowup") ? 1 : 0) - (k.has("s") || k.has("arrowdown") ? 1 : 0);
       const r = (k.has("d") || k.has("arrowright") ? 1 : 0) - (k.has("a") || k.has("arrowleft") ? 1 : 0);
       const dx = Math.cos(a) * f - Math.sin(a) * r, dy = Math.sin(a) * f + Math.cos(a) * r;
-      g.step(dt, { dx, dy, aimX: p.x + Math.cos(a) * 100, aimY: p.y + Math.sin(a) * 100, attack: ctl.attack || k.has(" ") });
+      g.step(dt, { dx, dy, aimX: p.x + Math.cos(a) * 100, aimY: p.y + Math.sin(a) * 100, attack: ctl.attack, jump: k.has(" ") || k.has("space"), sprint: k.has("shift") });
     }
     const px = p.x * S, pz = p.y * S;
     const cp = Math.cos(ctl.pitch);
@@ -215,7 +215,7 @@ function Character({ game, idx }: { game: MutableRefObject<Game>; idx: number })
     armR.current!.rotation.x = e.swingT > 0 ? -2.4 + (1 - e.swingT / 0.18) * 3 : -0.5 + sw * 0.4;
     armR.current!.rotation.z = e.swingT > 0 ? -0.4 : 0;
     const armor = ARMOR_COL[e.armor];
-    bodyMat.current!.color.set(e.hitFlash > 0 ? "#ffffff" : armor ?? teamCol);
+    bodyMat.current!.color.set(e.hitFlash > 0 ? "#ff2a2a" : armor ?? teamCol);
     swordMat.current!.color.set(SWORD_COL[e.sword]!);
     const hp = Math.max(0, e.hp / 100);
     hpBar.current!.scale.x = Math.max(0.001, hp); hpBar.current!.position.x = -(1 - hp) * 0.45;

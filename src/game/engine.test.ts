@@ -32,3 +32,14 @@ describe("flag wars rules", () => {
     expect(b.hp).toBeCloseTo(100 - 55);
   });
 });
+
+import { Game as G2, BHOP_MAX, SPRINT as SP2, REACH as R2 } from "./engine";
+import { describe as d2, it as i2, expect as e2 } from "vitest";
+d2("bhop & melee", () => {
+  i2("chained jumps while moving cap at 1.35x sprint", () => {
+    const g = new G2(); const p = g.player;
+    for (let i = 0; i < 600; i++) g.step(1 / 60, { dx: 1, dy: 0, aimX: p.x + 100, aimY: p.y, attack: false, jump: true, sprint: true });
+    e2(p.bhop * SP2).toBeCloseTo(BHOP_MAX, 5);
+  });
+  i2("melee reach is ~3.5 units", () => { e2(R2).toBe(140); });
+});

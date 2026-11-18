@@ -5,13 +5,15 @@ export const COLS = W / CELL, ROWS = H / CELL;
 export const WIN_SCORE = 3;
 export const ROUND_TIME = 300;
 export const SPEED = 230, RADIUS = 16, MAX_HP = 100, RESPAWN = 3;
-export const SWING_CD = 0.42, BOT_SWING_CD = 0.6, REACH = 64, ARC = 1.05;
+export const SWING_CD = 0.42, BOT_SWING_CD = 0.6, REACH = 140, ARC = 1.15;
 export const BASE_R = 120, FLAG_RETURN = 10, CARRY_SLOW = 0.85;
 export const BLOCK_HP = 60, PLACE_RANGE = 140;
 // vertical physics (sim px, 40px = 1 block)
 export const GRAVITY = 1500, JUMP_V = 470, SPRINT = 1.35, AIR_DRAG = 1.5, GROUND_DRAG = 10;
 export const TEAM_BLOCK_H = 44, WALL_H = 80;
 export const CRIT_MULT = 1.5;
+/** Bunny-hop: each chained jump while moving adds BHOP_STEP to speed, capped at BHOP_MAX (x sprint). */
+export const BHOP_STEP = 0.06, BHOP_MAX = 1.35, BHOP_DECAY = 3, KNOCKBACK = 460;
 // fireballs
 export const FB_SPEED = 620, FB_RADIUS = 110, FB_DMG = 22, FB_KB = 650, FB_LIFT = 820, FB_CD = 0.5, FB_LIFE = 2.5;
 
@@ -56,7 +58,7 @@ export interface Ent extends Body {
   hp: number; alive: boolean; respawn: number;
   swingT: number; swingCd: number; hitFlash: number;
   gold: number; goldAcc: number; sword: number; armor: number; blocks: number; fireballs: number; fbCd: number;
-  carrying: Team | null; kills: number;
+  carrying: Team | null; kills: number; bhop: number;
   avoid: number; avoidT: number; strafe: number; strafeT: number;
 }
 export interface Block { cx: number; cy: number; hp: number; team: Team | null }
@@ -139,7 +141,7 @@ export class Game {
       id: this.nextId++, name, team, isPlayer, role,
       x: b.x + (team === "red" ? 40 : -40), y: b.y + (i - 1) * 50, z: 0, vz: 0, grounded: true, kbx: 0, kby: 0,
       angle: team === "red" ? 0 : Math.PI, hp: MAX_HP, alive: true, respawn: 0,
-      swingT: 0, swingCd: 0, hitFlash: 0, gold: isPlayer ? this.cfg.startGold : 0, goldAcc: 0, sword: 0, armor: 0, blocks: 3,
+      swingT: 0, swingCd: 0, hitFlash: 0, bhop: 1, gold: isPlayer ? this.cfg.startGold : 0, goldAcc: 0, sword: 0, armor: 0, blocks: 3,
       fireballs: isPlayer ? this.cfg.fireballs : 0, fbCd: 0,
       carrying: null, kills: 0, avoid: 1, avoidT: 0, strafe: 1, strafeT: 0,
     };
@@ -262,9 +264,9 @@ export class Game {
     if (!t.alive) return;
     if (t.isPlayer && !from.isPlayer) raw *= this.cfg.botDmg;
     const dmg = raw * (1 - ARMORS[t.armor]!.reduce);
-    t.hp -= dmg; t.hitFlash = 0.15;
+    t.hp -= dmg; t.hitFlash = 0.22;
     const a = Math.atan2(t.y - from.y, t.x - from.x);
-    t.kbx += Math.cos(a) * 380; t.kby += Math.sin(a) * 380;
+    const kb = KNOCKBACK * (crit ? 1.3 : 1); t.kbx += Math.cos(a) * kb; t.kby += Math.sin(a) * kb;
     if (t.grounded) { t.vz = Math.max(t.vz, 180); t.grounded = false; }
     this.burst(t.x, t.y, t.team === "red" ? "#ff5a4e" : "#4aa8ff", 6, t.z + 45);
     if (crit) {
@@ -342,10 +344,17 @@ export class Game {
       } else [dx, dy, attack, jump] = this.think(e, dt);
       const len = Math.hypot(dx, dy);
       if (len > 1) { dx /= len; dy /= len; }
-      const sp = SPEED * (e.carrying ? CARRY_SLOW : 1) * (e.isPlayer ? (sprint ? SPRINT : 1) : 0.92 * Math.min(1.08, this.cfg.skill));
+      const sp = SPEED * (e.carrying ? CARRY_SLOW : 1) * (e.isPlayer ? (sprint ? SPRINT : 1) * e.bhop : 0.92 * Math.min(1.08, this.cfg.skill));
       this.moveEnt(e, dx * sp + e.kbx, dy * sp + e.kby, dt);
       const damp = Math.exp(-(e.grounded ? GROUND_DRAG : AIR_DRAG) * dt); e.kbx *= damp; e.kby *= damp;
-      if (stepVertical(e, jump, dt, this.groundH(e.x, e.y)) && e.isPlayer) this.events.push({ type: "jump", x: e.x, y: e.y, player: true });
+      const wasGrounded = e.grounded;
+      const jumped = stepVertical(e, jump, dt, this.groundH(e.x, e.y));
+      if (e.isPlayer) {
+        if (jumped && len > 0.1) e.bhop = Math.min(BHOP_MAX / (sprint ? SPRINT : 1), e.bhop + BHOP_STEP);
+        else if (e.grounded && wasGrounded && !jump) e.bhop = Math.max(1, e.bhop - BHOP_DECAY * dt);
+        if (len < 0.1) e.bhop = 1;
+      }
+      if (jumped && e.isPlayer) this.events.push({ type: "jump", x: e.x, y: e.y, player: true });
       if (attack && e.swingCd <= 0) this.swing(e);
       // gold
       let rate = 1;

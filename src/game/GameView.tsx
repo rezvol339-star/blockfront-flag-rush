@@ -30,7 +30,7 @@ export function GameView() {
   ctl.started = started && !hud.over;
 
   const buy = (item: "sword" | "armor" | "blocks" | "potion") => { gameRef.current.buy(gameRef.current.player, item); setHud(snap(gameRef.current)); };
-  const lock = () => { const c = wrapRef.current?.querySelector("canvas"); try { void c?.requestPointerLock?.(); } catch { /* not allowed */ } };
+  const lock = () => { const c = wrapRef.current?.querySelector("canvas"); c?.setAttribute("tabindex", "0"); c?.focus(); try { void c?.requestPointerLock?.(); } catch { /* not allowed */ } };
   const restart = () => { gameRef.current.reset(); ctl.yaw = 0; setHud(snap(gameRef.current)); setStarted(true); setShop(false); lock(); };
   const place = () => {
     const g = gameRef.current, p = g.player;
@@ -43,16 +43,22 @@ export function GameView() {
       if (k === "b") setShop((s) => !s);
       if (k === "1") buy("sword"); if (k === "2") buy("armor"); if (k === "3") buy("blocks"); if (k === "4") buy("potion");
       if (k === "f") place();
-      if (k === " " || k.startsWith("arrow")) e.preventDefault();
-      ctl.keys.add(k);
+      if (e.code === "Space" || k === " " || k.startsWith("arrow")) e.preventDefault();
+      ctl.keys.add(e.code === "Space" ? " " : k);
     };
-    const ku = (e: KeyboardEvent) => ctl.keys.delete(e.key.toLowerCase());
+    const ku = (e: KeyboardEvent) => ctl.keys.delete(e.code === "Space" ? " " : e.key.toLowerCase());
     const mm = (e: MouseEvent) => {
       if (document.pointerLockElement || (e.buttons & 2)) {
         ctl.yaw += e.movementX * MOUSE_SENS;
         ctl.pitch = Math.max(0.1, Math.min(1.1, ctl.pitch + e.movementY * MOUSE_SENS));
       }
     };
+    const md = (e: MouseEvent) => {
+      if (!ctl.started || e.button !== 0) return;
+      if ((e.target as HTMLElement)?.closest?.("button")) return;
+      ctl.attack = true;
+    };
+    const mu = (e: MouseEvent) => { if (e.button === 0) ctl.attack = false; };
     const onLock = () => setLocked(!!document.pointerLockElement);
     let raf = 0, last = performance.now(), hudT = 0;
     const tick = (now: number) => {
@@ -64,11 +70,11 @@ export function GameView() {
     };
     raf = requestAnimationFrame(tick);
     window.addEventListener("keydown", kd); window.addEventListener("keyup", ku);
-    window.addEventListener("mousemove", mm); document.addEventListener("pointerlockchange", onLock);
+    window.addEventListener("mousemove", mm); window.addEventListener("mousedown", md); window.addEventListener("mouseup", mu); document.addEventListener("pointerlockchange", onLock);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku);
-      window.removeEventListener("mousemove", mm); document.removeEventListener("pointerlockchange", onLock);
+      window.removeEventListener("mousemove", mm); window.removeEventListener("mousedown", md); window.removeEventListener("mouseup", mu); document.removeEventListener("pointerlockchange", onLock);
     };
   }, []);
 
@@ -82,10 +88,9 @@ export function GameView() {
         onPointerDown={(e) => {
           if (!ctl.started) return;
           if (!document.pointerLockElement && e.button === 0) lock();
-          if (e.button === 0) ctl.attack = true;
           if (e.button === 2 && document.pointerLockElement) place();
         }}
-        onPointerUp={(e) => { if (e.button === 0) ctl.attack = false; }}>
+        >
         <Scene game={gameRef} ctl={ctl} onReady={() => wrapRef.current?.setAttribute("data-scene-ready", "true")} />
       </Canvas>
 
