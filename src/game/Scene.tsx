@@ -29,9 +29,9 @@ function Stepper({ game, ctl }: { game: MutableRefObject<Game>; ctl: Controls })
     }
     const px = p.x * S, pz = p.y * S;
     const cp = Math.cos(ctl.pitch);
-    target.set(px - Math.cos(a) * CAM_DIST * cp, 1.6 + CAM_DIST * Math.sin(ctl.pitch), pz - Math.sin(a) * CAM_DIST * cp);
+    target.set(px - Math.cos(a) * CAM_DIST * cp, 1.6 + p.z * S * 0.6 + CAM_DIST * Math.sin(ctl.pitch), pz - Math.sin(a) * CAM_DIST * cp);
     camera.position.lerp(target, 1 - Math.exp(-CAM_LERP * dt));
-    camera.lookAt(px + Math.cos(a) * 3, 1.3, pz + Math.sin(a) * 3);
+    camera.lookAt(px + Math.cos(a) * 3, 1.3 + p.z * S * 0.8, pz + Math.sin(a) * 3);
   }, -1);
   return null;
 }
@@ -209,7 +209,7 @@ function Character({ game, idx }: { game: MutableRefObject<Game>; idx: number })
     last.current.x = e.x; last.current.y = e.y;
     if (moved > 0.5 && moved < 30) last.current.phase += moved * 0.06; else last.current.phase *= Math.exp(-8 * dt);
     const sw = Math.sin(last.current.phase) * 0.7;
-    r.position.set(e.x * S, 0, e.y * S);
+    r.position.set(e.x * S, e.z * S, e.y * S);
     r.rotation.y = Math.PI / 2 - e.angle;
     legL.current!.rotation.x = sw; legR.current!.rotation.x = -sw; armL.current!.rotation.x = -sw;
     armR.current!.rotation.x = e.swingT > 0 ? -2.4 + (1 - e.swingT / 0.18) * 3 : -0.5 + sw * 0.4;
