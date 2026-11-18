@@ -30,7 +30,14 @@ export const ARMORS = [
 export const BLOCK_PACK = { count: 6, cost: 10 };
 export const POTION = { heal: 50, cost: 8 };
 export const FIREBALL_PACK = { count: 2, cost: 12 };
-export type ShopItem = "sword" | "armor" | "blocks" | "potion" | "fireball";
+// dynamite: lobbed, fuse then big blast that wrecks placed blocks
+export const DYNAMITE_PACK = { count: 1, cost: 15 };
+export const TNT_SPEED = 430, TNT_UP = 420, TNT_FUSE = 1.6, TNT_RADIUS = 170, TNT_DMG = 45, TNT_BLOCK_DMG = 200, TNT_KB = 900;
+/** Hotbar slots, in order (keys 1-4). */
+export const ITEMS = ["sword", "blocks", "fireball", "dynamite"] as const;
+export type ItemSlot = (typeof ITEMS)[number];
+export const PLACE_CD = 0.18, PLACE_DIST = 70;
+export type ShopItem = "sword" | "armor" | "blocks" | "potion" | "fireball" | "dynamite";
 
 export type Mode = "solo" | "ranked" | "training";
 export const MODES: Record<Mode, { label: string; red: number; blue: number; flags: boolean; time: number; skill: number; botDmg: number; startGold: number; fireballs: number }> = {
@@ -57,7 +64,7 @@ export interface Ent extends Body {
   kbx: number; kby: number; angle: number;
   hp: number; alive: boolean; respawn: number;
   swingT: number; swingCd: number; hitFlash: number;
-  gold: number; goldAcc: number; sword: number; armor: number; blocks: number; fireballs: number; fbCd: number;
+  gold: number; goldAcc: number; sword: number; armor: number; blocks: number; fireballs: number; fbCd: number; dynamite: number; useCd: number;
   carrying: Team | null; kills: number; bhop: number;
   avoid: number; avoidT: number; strafe: number; strafeT: number;
 }
@@ -65,7 +72,7 @@ export interface Block { cx: number; cy: number; hp: number; team: Team | null }
 export interface Flag { team: Team; x: number; y: number; home: boolean; carrier: number | null; dropT: number }
 export interface Particle { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; color: string; size: number }
 export interface FloatText { x: number; y: number; text: string; life: number; color: string }
-export interface Fireball { x: number; y: number; z: number; vx: number; vy: number; vz: number; owner: number; team: Team; life: number }
+export interface Fireball { x: number; y: number; z: number; vx: number; vy: number; vz: number; owner: number; team: Team; life: number; kind?: "fire" | "tnt" }
 export interface GameEvent { type: "swing" | "hit" | "crit" | "boom" | "jump" | "throw" | "capture" | "death"; x: number; y: number; player: boolean }
 export interface Input { dx: number; dy: number; aimX: number; aimY: number; attack: boolean; jump?: boolean; sprint?: boolean }
 
@@ -142,7 +149,7 @@ export class Game {
       x: b.x + (team === "red" ? 40 : -40), y: b.y + (i - 1) * 50, z: 0, vz: 0, grounded: true, kbx: 0, kby: 0,
       angle: team === "red" ? 0 : Math.PI, hp: MAX_HP, alive: true, respawn: 0,
       swingT: 0, swingCd: 0, hitFlash: 0, bhop: 1, gold: isPlayer ? this.cfg.startGold : 0, goldAcc: 0, sword: 0, armor: 0, blocks: 3,
-      fireballs: isPlayer ? this.cfg.fireballs : 0, fbCd: 0,
+      fireballs: isPlayer ? this.cfg.fireballs : 0, fbCd: 0, dynamite: isPlayer ? 1 : 0, useCd: 0,
       carrying: null, kills: 0, avoid: 1, avoidT: 0, strafe: 1, strafeT: 0,
     };
   }
@@ -190,6 +197,9 @@ export class Game {
     } else if (item === "fireball") {
       if (e.gold < FIREBALL_PACK.cost) return false;
       e.gold -= FIREBALL_PACK.cost; e.fireballs += FIREBALL_PACK.count;
+    } else if (item === "dynamite") {
+      if (e.gold < DYNAMITE_PACK.cost) return false;
+      e.gold -= DYNAMITE_PACK.cost; e.dynamite += DYNAMITE_PACK.count;
     } else {
       if (e.gold < POTION.cost || e.hp >= MAX_HP || !e.alive) return false;
       e.gold -= POTION.cost; e.hp = Math.min(MAX_HP, e.hp + POTION.heal);
@@ -225,29 +235,67 @@ export class Game {
     return true;
   }
 
+  throwDynamite(e: Ent, yaw: number): boolean {
+    if (!e.alive || e.dynamite <= 0 || e.fbCd > 0) return false;
+    this.fireballs.push({
+      x: e.x + Math.cos(yaw) * 18, y: e.y + Math.sin(yaw) * 18, z: e.z + 60,
+      vx: Math.cos(yaw) * TNT_SPEED, vy: Math.sin(yaw) * TNT_SPEED, vz: TNT_UP,
+      owner: e.id, team: e.team, life: TNT_FUSE, kind: "tnt",
+    });
+    e.dynamite--; e.fbCd = FB_CD;
+    this.events.push({ type: "throw", x: e.x, y: e.y, player: e.isPlayer });
+    return true;
+  }
+
+  /** Use the item in a hotbar slot (sword swings are handled by Input.attack). */
+  useItem(e: Ent, slot: ItemSlot, yaw: number): boolean {
+    if (slot === "fireball") return this.throwFireball(e, yaw, -0.05);
+    if (slot === "dynamite") return this.throwDynamite(e, yaw);
+    if (slot === "blocks") {
+      if (e.useCd > 0) return false;
+      const ok = this.placeBlock(e, e.x + Math.cos(yaw) * PLACE_DIST, e.y + Math.sin(yaw) * PLACE_DIST);
+      if (ok) e.useCd = PLACE_CD;
+      return ok;
+    }
+    return false;
+  }
+
   explode(fb: Fireball) {
+    const tnt = fb.kind === "tnt";
+    const R = tnt ? TNT_RADIUS : FB_RADIUS, KB = tnt ? TNT_KB : FB_KB, DMG = tnt ? TNT_DMG : FB_DMG, BD = tnt ? TNT_BLOCK_DMG : 40;
     const owner = this.ents.find((e) => e.id === fb.owner) ?? null;
-    this.burst(fb.x, fb.y, "#ff8a2a", 22, fb.z); this.burst(fb.x, fb.y, "#ffe066", 10, fb.z);
+    this.burst(fb.x, fb.y, "#ff8a2a", tnt ? 40 : 22, fb.z); if (tnt) this.burst(fb.x, fb.y, "#555555", 16, fb.z); this.burst(fb.x, fb.y, "#ffe066", 10, fb.z);
     this.events.push({ type: "boom", x: fb.x, y: fb.y, player: !!owner?.isPlayer });
     for (const e of this.ents) {
       if (!e.alive) continue;
       const hx = e.x - fb.x, hy = e.y - fb.y, hz = e.z + 30 - fb.z;
       const d = Math.hypot(hx, hy, hz);
-      if (d >= FB_RADIUS) continue;
-      const f = 1 - d / FB_RADIUS, hl = Math.hypot(hx, hy);
-      if (hl > 0.001) { e.kbx += (hx / hl) * FB_KB * f; e.kby += (hy / hl) * FB_KB * f; }
+      if (d >= R) continue;
+      const f = 1 - d / R, hl = Math.hypot(hx, hy);
+      if (hl > 0.001) { e.kbx += (hx / hl) * KB * f; e.kby += (hy / hl) * KB * f; }
       e.vz = Math.max(e.vz, FB_LIFT * Math.sqrt(f)); e.grounded = false;
-      if (owner && e.team !== fb.team) this.damage(e, FB_DMG * f + 6, owner);
+      if (owner && e.team !== fb.team) this.damage(e, DMG * f + 6, owner);
     }
     for (const b of [...this.blocks.values()]) {
       if (!b.team) continue;
-      if (dist(b.cx * CELL + CELL / 2, b.cy * CELL + CELL / 2, fb.x, fb.y) < FB_RADIUS * 0.8) { b.hp -= 40; if (b.hp <= 0) this.blocks.delete(k(b.cx, b.cy)); }
+      if (dist(b.cx * CELL + CELL / 2, b.cy * CELL + CELL / 2, fb.x, fb.y) < R * 0.8) { b.hp -= BD; if (b.hp <= 0) this.blocks.delete(k(b.cx, b.cy)); }
     }
   }
 
   private stepFireballs(dt: number) {
     const keep: Fireball[] = [];
     for (const fb of this.fireballs) {
+      if (fb.kind === "tnt") {
+        fb.vz -= GRAVITY * dt;
+        const nx = fb.x + fb.vx * dt, ny = fb.y + fb.vy * dt;
+        if (this.collides(nx, fb.y, 6, fb.z)) fb.vx *= -0.4; else fb.x = nx;
+        if (this.collides(fb.x, ny, 6, fb.z)) fb.vy *= -0.4; else fb.y = ny;
+        fb.z += fb.vz * dt; fb.life -= dt;
+        const gh = this.groundH(fb.x, fb.y);
+        if (fb.z <= gh) { fb.z = gh; fb.vz = Math.abs(fb.vz) > 120 ? -fb.vz * 0.3 : 0; fb.vx *= 0.6; fb.vy *= 0.6; }
+        if (fb.life <= 0) this.explode(fb); else keep.push(fb);
+        continue;
+      }
       fb.vz -= 300 * dt;
       fb.x += fb.vx * dt; fb.y += fb.vy * dt; fb.z += fb.vz * dt; fb.life -= dt;
       let hit = fb.life <= 0 || fb.z <= this.groundH(fb.x, fb.y) || this.collides(fb.x, fb.y, 6, fb.z);
@@ -336,7 +384,7 @@ export class Game {
         }
         continue;
       }
-      e.swingCd -= dt; e.swingT -= dt; e.hitFlash -= dt; e.fbCd -= dt;
+      e.swingCd -= dt; e.swingT -= dt; e.hitFlash -= dt; e.fbCd -= dt; e.useCd -= dt;
       let dx = 0, dy = 0, attack = false, jump = false, sprint = false;
       if (e.isPlayer) {
         dx = input.dx; dy = input.dy; attack = input.attack; jump = !!input.jump; sprint = !!input.sprint;
