@@ -43,3 +43,14 @@ d2("bhop & melee", () => {
   });
   i2("melee reach is ~3.5 units", () => { e2(R2).toBe(140); });
 });
+
+import { Game as G3, SWING_CD as CD3 } from "./engine";
+import { it as i3, expect as e3 } from "vitest";
+i3("holding attack keeps swinging once per cooldown", () => {
+  const g = new G3(); const p = g.player; let swings = 0;
+  for (let i = 0; i < 120; i++) {
+    g.step(1 / 60, { dx: 0, dy: 0, aimX: p.x + 100, aimY: p.y, attack: true });
+    swings += g.events.filter((ev) => ev.type === "swing" && ev.player).length;
+  }
+  e3(swings).toBeGreaterThanOrEqual(Math.floor(2 / CD3) - 1);
+});

@@ -59,6 +59,7 @@ export function GameView() {
       ctl.attack = true;
     };
     const mu = (e: MouseEvent) => { if (e.button === 0) ctl.attack = false; };
+    const blur = () => { ctl.attack = false; ctl.keys.clear(); };
     const onLock = () => setLocked(!!document.pointerLockElement);
     let raf = 0, last = performance.now(), hudT = 0;
     const tick = (now: number) => {
@@ -70,11 +71,11 @@ export function GameView() {
     };
     raf = requestAnimationFrame(tick);
     window.addEventListener("keydown", kd); window.addEventListener("keyup", ku);
-    window.addEventListener("mousemove", mm); window.addEventListener("mousedown", md); window.addEventListener("mouseup", mu); document.addEventListener("pointerlockchange", onLock);
+    window.addEventListener("mousemove", mm); window.addEventListener("mousedown", md); window.addEventListener("mouseup", mu); document.addEventListener("pointerlockchange", onLock); window.addEventListener("blur", blur);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku);
-      window.removeEventListener("mousemove", mm); window.removeEventListener("mousedown", md); window.removeEventListener("mouseup", mu); document.removeEventListener("pointerlockchange", onLock);
+      window.removeEventListener("mousemove", mm); window.removeEventListener("mousedown", md); window.removeEventListener("mouseup", mu); document.removeEventListener("pointerlockchange", onLock); window.removeEventListener("blur", blur);
     };
   }, []);
 
