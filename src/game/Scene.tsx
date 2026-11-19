@@ -2,7 +2,7 @@ import { useMemo, useRef, type MutableRefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Billboard, Environment, Html, Lightformer } from "@react-three/drei";
 import * as THREE from "three";
-import { BASES, BASE_R, CELL, H, MINES, W, type Game, type Team } from "./engine";
+import { BASES, BASE_R, CELL, CIRCLE_R, CIRCLE_REACH, H, MINES, RADIUS, W, type Game, type Team } from "./engine";
 
 // 1 world unit = 1 grid cell (40 sim px). Sim (x, y) maps to world (x, z).
 export const S = 1 / CELL;
@@ -12,7 +12,13 @@ const SWORD_COL = ["#a8743a", "#d6dde4", "#5ff0f0"];
 const ARMOR_COL = [null, "#c7cdd3", "#5ff0f0"];
 const CAM_DIST = 7, CAM_LERP = 12;
 
-export interface Controls { keys: Set<string>; yaw: number; pitch: number; attack: boolean; started: boolean }
+export interface Controls { keys: Set<string>; yaw: number; pitch: number; attack: boolean; started: boolean;
+  /** "circle": mouse moves a ground reticle (cf forward / cs sideways, sim px from player, camera-relative). */
+  mode: "crosshair" | "circle"; cf: number; cs: number }
+export const circleWorld = (p: { x: number; y: number }, ctl: Controls) => ({
+  x: p.x + Math.cos(ctl.yaw) * ctl.cf - Math.sin(ctl.yaw) * ctl.cs,
+  y: p.y + Math.sin(ctl.yaw) * ctl.cf + Math.cos(ctl.yaw) * ctl.cs,
+});
 
 function Stepper({ game, ctl }: { game: MutableRefObject<Game>; ctl: Controls }) {
   const { camera } = useThree();
@@ -27,7 +33,7 @@ function Stepper({ game, ctl }: { game: MutableRefObject<Game>; ctl: Controls })
       const f = (k.has("w") || k.has("arrowup") ? 1 : 0) - (k.has("s") || k.has("arrowdown") ? 1 : 0);
       const r = (k.has("d") || k.has("arrowright") ? 1 : 0) - (k.has("a") || k.has("arrowleft") ? 1 : 0);
       const dx = Math.cos(a) * f - Math.sin(a) * r, dy = Math.sin(a) * f + Math.cos(a) * r;
-      g.step(dt, { dx, dy, aimX: p.x + Math.cos(a) * 100, aimY: p.y + Math.sin(a) * 100, attack: ctl.attack, jump: k.has(" ") || k.has("space"), sprint: k.has("shift") });
+      g.step(dt, { dx, dy, aimX: p.x + Math.cos(a) * 100, aimY: p.y + Math.sin(a) * 100, attack: ctl.attack, circle: ctl.mode === "circle" ? { ...circleWorld(p, ctl), r: CIRCLE_R } : null, jump: k.has(" ") || k.has("space"), sprint: k.has("shift") });
       for (const ev of g.events) {
         if (ev.type === "crit" && ev.player) { fx.current.stop = 0.08; fx.current.shake = 0.28; playCrit(); }
         else if (ev.type === "hit" && ev.player) fx.current.shake = Math.max(fx.current.shake, 0.08);
@@ -324,9 +330,31 @@ export function Scene({ game, ctl, onReady }: { game: MutableRefObject<Game>; ct
       <Flag game={game} team="red" />
       <Flag game={game} team="blue" />
       {Array.from({ length: n }, (_, i) => <Character key={i} game={game} idx={i} />)}
+      <AimRing game={game} ctl={ctl} />
       <Particles game={game} />
       <FloatTexts game={game} />
       <Ready onReady={onReady} />
     </>
+  );
+}
+
+function AimRing({ game, ctl }: { game: MutableRefObject<Game>; ctl: Controls }) {
+  const ref = useRef<THREE.Mesh>(null);
+  const mat = useRef<THREE.MeshBasicMaterial>(null);
+  useFrame(() => {
+    const m = ref.current, g = game.current, p = g.player;
+    if (!m || !mat.current) return;
+    m.visible = ctl.started && ctl.mode === "circle" && p.alive;
+    if (!m.visible) return;
+    const c = circleWorld(p, ctl);
+    m.position.set(c.x * S, 0.06, c.y * S);
+    const hot = g.ents.some((o) => o.alive && o.team !== p.team && Math.hypot(o.x - c.x, o.y - c.y) < CIRCLE_R + RADIUS && Math.hypot(o.x - p.x, o.y - p.y) < CIRCLE_REACH + RADIUS);
+    mat.current.color.set(hot ? "#ff3b3b" : "#ffd84a");
+  });
+  return (
+    <mesh ref={ref} rotation-x={-Math.PI / 2} visible={false}>
+      <ringGeometry args={[CIRCLE_R * S * 0.82, CIRCLE_R * S, 40]} />
+      <meshBasicMaterial ref={mat} color="#ffd84a" transparent opacity={0.85} depthWrite={false} />
+    </mesh>
   );
 }

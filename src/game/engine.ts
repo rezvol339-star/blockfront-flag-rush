@@ -67,6 +67,7 @@ export interface Ent extends Body {
   gold: number; goldAcc: number; sword: number; armor: number; blocks: number; fireballs: number; fbCd: number; dynamite: number; useCd: number;
   carrying: Team | null; kills: number; bhop: number;
   avoid: number; avoidT: number; strafe: number; strafeT: number;
+  aimCircle?: AimCircle | null;
 }
 export interface Block { cx: number; cy: number; hp: number; team: Team | null }
 export interface Flag { team: Team; x: number; y: number; home: boolean; carrier: number | null; dropT: number }
@@ -74,7 +75,10 @@ export interface Particle { x: number; y: number; z: number; vx: number; vy: num
 export interface FloatText { x: number; y: number; text: string; life: number; color: string }
 export interface Fireball { x: number; y: number; z: number; vx: number; vy: number; vz: number; owner: number; team: Team; life: number; kind?: "fire" | "tnt" }
 export interface GameEvent { type: "swing" | "hit" | "crit" | "boom" | "jump" | "throw" | "capture" | "death"; x: number; y: number; player: boolean }
-export interface Input { dx: number; dy: number; aimX: number; aimY: number; attack: boolean; jump?: boolean; sprint?: boolean }
+export interface Input { dx: number; dy: number; aimX: number; aimY: number; attack: boolean; jump?: boolean; sprint?: boolean; circle?: AimCircle | null }
+/** Circle aim mode: a movable ground reticle. Enemies inside it (and within CIRCLE_REACH) are hit regardless of facing arc. */
+export interface AimCircle { x: number; y: number; r: number }
+export const CIRCLE_R = 55, CIRCLE_REACH = 190;
 
 export const other = (t: Team): Team => (t === "red" ? "blue" : "red");
 const k = (cx: number, cy: number) => cx + "," + cy;
@@ -350,6 +354,8 @@ export class Game {
     for (const o of this.ents) {
       if (!o.alive || o.team === e.team || Math.abs(o.z - e.z) > 90) continue;
       const d = dist(e.x, e.y, o.x, o.y);
+      const c = e.aimCircle;
+      if (c && d < CIRCLE_REACH + RADIUS && dist(c.x, c.y, o.x, o.y) < c.r + RADIUS) { this.damage(o, dmg, e, crit); continue; }
       if (d < REACH + RADIUS && (d < RADIUS * 2 || angDiff(Math.atan2(o.y - e.y, o.x - e.x), e.angle) < ARC)) this.damage(o, dmg, e, crit);
     }
     const px = e.x + Math.cos(e.angle) * 40, py = e.y + Math.sin(e.angle) * 40;
@@ -390,6 +396,8 @@ export class Game {
       if (e.isPlayer) {
         dx = input.dx; dy = input.dy; attack = input.attack; jump = !!input.jump; sprint = !!input.sprint;
         e.angle = Math.atan2(input.aimY - e.y, input.aimX - e.x);
+        e.aimCircle = input.circle ?? null;
+        if (e.aimCircle && dist(e.x, e.y, e.aimCircle.x, e.aimCircle.y) > 4) e.angle = Math.atan2(e.aimCircle.y - e.y, e.aimCircle.x - e.x);
       } else [dx, dy, attack, jump] = this.think(e, dt);
       const len = Math.hypot(dx, dy);
       if (len > 1) { dx /= len; dy /= len; }

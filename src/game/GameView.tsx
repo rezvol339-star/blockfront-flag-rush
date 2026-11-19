@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import * as THREE from "three";
-import { ARMORS, BLOCK_PACK, Game, MAX_HP, POTION, SWORDS, WIN_SCORE, type Team } from "./engine";
+import { ARMORS, BLOCK_PACK, CIRCLE_REACH, Game, MAX_HP, POTION, SWORDS, WIN_SCORE, type Team } from "./engine";
 import { Scene, type Controls } from "./Scene";
 
 type Hud = {
@@ -17,12 +17,14 @@ const snap = (g: Game): Hud => {
     feed: g.feed.map((f) => ({ text: f.text, team: f.team })), kills: p.kills,
   };
 };
-const MOUSE_SENS = 0.0025, KEY_TURN = 2.4, PLACE_DIST = 70;
+const CIRCLE_SENS = 0.6, MOUSE_SENS = 0.0025, KEY_TURN = 2.4, PLACE_DIST = 70;
 
 export function GameView() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Game>(new Game());
-  const ctl = useRef<Controls>({ keys: new Set(), yaw: 0, pitch: 0.38, attack: false, started: false }).current;
+  const ctl = useRef<Controls>({ keys: new Set(), yaw: 0, pitch: 0.38, attack: false, started: false, mode: "crosshair", cf: 110, cs: 0 }).current;
+  const [mode, setMode] = useState<Controls["mode"]>("crosshair");
+  const toggleMode = () => { ctl.mode = ctl.mode === "crosshair" ? "circle" : "crosshair"; ctl.cf = 110; ctl.cs = 0; setMode(ctl.mode); };
   const [hud, setHud] = useState<Hud>(() => snap(gameRef.current));
   const [started, setStarted] = useState(false);
   const [shop, setShop] = useState(false);
@@ -43,12 +45,21 @@ export function GameView() {
       if (k === "b") setShop((s) => !s);
       if (k === "1") buy("sword"); if (k === "2") buy("armor"); if (k === "3") buy("blocks"); if (k === "4") buy("potion");
       if (k === "f") place();
+      if (e.code === "Tab") { e.preventDefault(); if (!e.repeat) toggleMode(); return; }
       if (e.code === "Space" || k === " " || k.startsWith("arrow")) e.preventDefault();
       ctl.keys.add(e.code === "Space" ? " " : k);
     };
     const ku = (e: KeyboardEvent) => ctl.keys.delete(e.code === "Space" ? " " : e.key.toLowerCase());
     const mm = (e: MouseEvent) => {
       if (document.pointerLockElement || (e.buttons & 2)) {
+        if (ctl.mode === "circle") {
+          // Mouse moves the ring; pushing it past the side limit turns the camera.
+          ctl.cf = Math.max(30, Math.min(CIRCLE_REACH, ctl.cf - e.movementY * CIRCLE_SENS));
+          const cs = ctl.cs + e.movementX * CIRCLE_SENS, lim = 120;
+          ctl.cs = Math.max(-lim, Math.min(lim, cs));
+          ctl.yaw += (cs - ctl.cs) * 0.006;
+          return;
+        }
         ctl.yaw += e.movementX * MOUSE_SENS;
         ctl.pitch = Math.max(0.1, Math.min(1.1, ctl.pitch + e.movementY * MOUSE_SENS));
       }
@@ -95,7 +106,18 @@ export function GameView() {
         <Scene game={gameRef} ctl={ctl} onReady={() => wrapRef.current?.setAttribute("data-scene-ready", "true")} />
       </Canvas>
 
-      {started && locked && <div className="pointer-events-none absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-border bg-foreground" />}
+      {started && locked && mode === "crosshair" && (
+        <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <div className="absolute left-1/2 top-1/2 h-0.5 w-5 -translate-x-1/2 -translate-y-1/2 bg-foreground" />
+          <div className="absolute left-1/2 top-1/2 h-5 w-0.5 -translate-x-1/2 -translate-y-1/2 bg-foreground" />
+        </div>
+      )}
+      {started && !hud.over && (
+        <button onClick={toggleMode} className="block-btn absolute left-3 top-3 flex items-center gap-2 px-3 py-1.5 text-sm" aria-label="Switch aim mode">
+          <span className={`inline-block h-4 w-4 ${mode === "circle" ? "rounded-full border-[3px] border-gold" : "border-2 border-foreground"}`} />
+          {mode === "circle" ? "Circle aim" : "Crosshair aim"} <span className="opacity-70">(Tab)</span>
+        </button>
+      )}
 
       <div className="pointer-events-none absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-3">
         <div className="block-panel bg-team-red px-4 py-1 font-display text-3xl text-outline">{hud.score.red}</div>
@@ -128,7 +150,7 @@ export function GameView() {
 
       <div className="pointer-events-none absolute bottom-3 right-3 block-panel px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
         <b className="text-foreground">WASD</b> move · <b className="text-foreground">Mouse</b> look · <b className="text-foreground">Click</b> swing<br />
-        <b className="text-foreground">Right click / F</b> place block · <b className="text-foreground">Q/E</b> turn · <b className="text-foreground">B</b> shop · <b className="text-foreground">Esc</b> free mouse
+        <b className="text-foreground">Right click / F</b> place block · <b className="text-foreground">Q/E</b> turn · <b className="text-foreground">B</b> shop · <b className="text-foreground">Esc</b> free mouse<br /><b className="text-foreground">Tab</b> switch aim: crosshair / circle (mouse moves the ring)
       </div>
 
       {hud.carrying && <div className="pointer-events-none absolute left-1/2 top-24 -translate-x-1/2 animate-pulse font-display text-2xl text-gold text-outline">You have the flag! Run home!</div>}

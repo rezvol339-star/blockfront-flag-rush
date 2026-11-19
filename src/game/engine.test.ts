@@ -65,3 +65,24 @@ i4("airborne attacks crit for 1.75x, grounded don't", () => {
   e4(isCrit(p)).toBe(true);
   e4(CRIT_MULT).toBe(1.75);
 });
+
+describe("circle aim mode", () => {
+  it("hits an enemy inside the ring even when it is behind the facing arc of the aim point", () => {
+    const g = new Game();
+    const p = g.player;
+    for (const o of g.ents) if (o !== p) { o.alive = false; }
+    const foe = g.ents.find((o) => o.team !== p.team)!;
+    foe.alive = true; foe.hp = 100; foe.x = p.x + 170; foe.y = p.y; foe.z = 0; p.z = 0;
+    g.step(0.016, { dx: 0, dy: 0, aimX: p.x, aimY: p.y - 100, attack: true, circle: { x: p.x + 170, y: p.y, r: 55 } });
+    expect(foe.hp).toBeLessThan(100);
+  });
+  it("switching to circle mode keeps the swing cooldown", () => {
+    const g = new Game();
+    const p = g.player;
+    g.step(0.016, { dx: 0, dy: 0, aimX: p.x + 100, aimY: p.y, attack: true });
+    const cd = p.swingCd;
+    g.step(0.016, { dx: 0, dy: 0, aimX: p.x + 100, aimY: p.y, attack: true, circle: { x: p.x + 100, y: p.y, r: 55 } });
+    expect(p.swingCd).toBeLessThan(cd);
+    expect(p.swingCd).toBeGreaterThan(0);
+  });
+});
