@@ -54,3 +54,14 @@ i3("holding attack keeps swinging once per cooldown", () => {
   }
   e3(swings).toBeGreaterThanOrEqual(Math.floor(2 / CD3) - 1);
 });
+
+import { Game as G4, SWORDS, CRIT_MULT, MAX_HP as MH, isCrit } from "./engine";
+import { it as i4, expect as e4 } from "vitest";
+i4("grounded wooden sword needs more than 2 hits to kill", () => { e4(SWORDS[0]!.dmg * 2).toBeLessThan(MH); e4(Math.ceil(MH / SWORDS[2]!.dmg)).toBeGreaterThanOrEqual(5); });
+i4("airborne attacks crit for 1.75x, grounded don't", () => {
+  const g = new G4(); const p = g.player;
+  e4(isCrit(p)).toBe(false);
+  p.grounded = false; p.z = 30; p.vz = 100;
+  e4(isCrit(p)).toBe(true);
+  e4(CRIT_MULT).toBe(1.75);
+});

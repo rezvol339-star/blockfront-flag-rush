@@ -11,16 +11,16 @@ export const BLOCK_HP = 60, PLACE_RANGE = 140;
 // vertical physics (sim px, 40px = 1 block)
 export const GRAVITY = 1500, JUMP_V = 470, SPRINT = 1.35, AIR_DRAG = 1.5, GROUND_DRAG = 10;
 export const TEAM_BLOCK_H = 44, WALL_H = 80;
-export const CRIT_MULT = 1.5;
+export const CRIT_MULT = 1.75;
 /** Bunny-hop: each chained jump while moving adds BHOP_STEP to speed, capped at BHOP_MAX (x sprint). */
 export const BHOP_STEP = 0.06, BHOP_MAX = 1.35, BHOP_DECAY = 3, KNOCKBACK = 460;
 // fireballs
-export const FB_SPEED = 620, FB_RADIUS = 110, FB_DMG = 22, FB_KB = 650, FB_LIFT = 820, FB_CD = 0.5, FB_LIFE = 2.5;
+export const FB_SPEED = 620, FB_RADIUS = 110, FB_DMG = 16, FB_KB = 650, FB_LIFT = 820, FB_CD = 0.5, FB_LIFE = 2.5;
 
 export const SWORDS = [
-  { name: "Wooden Sword", dmg: 18, cost: 0 },
-  { name: "Iron Sword", dmg: 28, cost: 25 },
-  { name: "Diamond Sword", dmg: 40, cost: 60 },
+  { name: "Wooden Sword", dmg: 11, cost: 0 },
+  { name: "Iron Sword", dmg: 15, cost: 25 },
+  { name: "Diamond Sword", dmg: 20, cost: 60 },
 ];
 export const ARMORS = [
   { name: "No Armor", reduce: 0, cost: 0 },
@@ -32,7 +32,7 @@ export const POTION = { heal: 50, cost: 8 };
 export const FIREBALL_PACK = { count: 2, cost: 12 };
 // dynamite: lobbed, fuse then big blast that wrecks placed blocks
 export const DYNAMITE_PACK = { count: 1, cost: 15 };
-export const TNT_SPEED = 430, TNT_UP = 420, TNT_FUSE = 1.6, TNT_RADIUS = 170, TNT_DMG = 45, TNT_BLOCK_DMG = 200, TNT_KB = 900;
+export const TNT_SPEED = 430, TNT_UP = 420, TNT_FUSE = 1.6, TNT_RADIUS = 170, TNT_DMG = 35, TNT_BLOCK_DMG = 200, TNT_KB = 900;
 /** Hotbar slots, in order (keys 1-4). */
 export const ITEMS = ["sword", "blocks", "fireball", "dynamite"] as const;
 export type ItemSlot = (typeof ITEMS)[number];
@@ -91,8 +91,8 @@ export function stepVertical(b: Body, jump: boolean, dt: number, groundH: number
   else b.grounded = false;
   return jumped;
 }
-/** Minecraft-style crit: attacking while falling after leaving the ground. */
-export const isCrit = (b: Body) => !b.grounded && b.vz < 0;
+/** Jump crit: any attack made while airborne (rising or falling) after leaving the ground. */
+export const isCrit = (b: Body) => !b.grounded && b.z > 2;
 
 const WALLS_LEFT: [number, number[]][] = [
   [8, [6, 7, 8, 9, 15, 16, 17, 18]],
@@ -373,6 +373,7 @@ export class Game {
 
   // ---- main step ----
   step(dt: number, input: Input) {
+    this.events = [];
     if (this.over) { this.tickFx(dt); return; }
     this.time -= dt;
     for (const e of this.ents) {

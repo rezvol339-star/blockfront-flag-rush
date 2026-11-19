@@ -1,6 +1,6 @@
 import { useMemo, useRef, type MutableRefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Billboard, Environment, Lightformer } from "@react-three/drei";
+import { Billboard, Environment, Html, Lightformer } from "@react-three/drei";
 import * as THREE from "three";
 import { BASES, BASE_R, CELL, H, MINES, W, type Game, type Team } from "./engine";
 
@@ -17,23 +17,73 @@ export interface Controls { keys: Set<string>; yaw: number; pitch: number; attac
 function Stepper({ game, ctl }: { game: MutableRefObject<Game>; ctl: Controls }) {
   const { camera } = useThree();
   const target = useMemo(() => new THREE.Vector3(), []);
+  const fx = useRef({ stop: 0, shake: 0 });
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
     const g = game.current, p = g.player, a = ctl.yaw;
-    if (ctl.started) {
+    fx.current.stop -= dt; fx.current.shake = Math.max(0, fx.current.shake - dt);
+    if (ctl.started && fx.current.stop <= 0) {
       const k = ctl.keys;
       const f = (k.has("w") || k.has("arrowup") ? 1 : 0) - (k.has("s") || k.has("arrowdown") ? 1 : 0);
       const r = (k.has("d") || k.has("arrowright") ? 1 : 0) - (k.has("a") || k.has("arrowleft") ? 1 : 0);
       const dx = Math.cos(a) * f - Math.sin(a) * r, dy = Math.sin(a) * f + Math.cos(a) * r;
       g.step(dt, { dx, dy, aimX: p.x + Math.cos(a) * 100, aimY: p.y + Math.sin(a) * 100, attack: ctl.attack, jump: k.has(" ") || k.has("space"), sprint: k.has("shift") });
+      for (const ev of g.events) {
+        if (ev.type === "crit" && ev.player) { fx.current.stop = 0.08; fx.current.shake = 0.28; playCrit(); }
+        else if (ev.type === "hit" && ev.player) fx.current.shake = Math.max(fx.current.shake, 0.08);
+      }
     }
     const px = p.x * S, pz = p.y * S;
     const cp = Math.cos(ctl.pitch);
     target.set(px - Math.cos(a) * CAM_DIST * cp, 1.6 + p.z * S * 0.6 + CAM_DIST * Math.sin(ctl.pitch), pz - Math.sin(a) * CAM_DIST * cp);
     camera.position.lerp(target, 1 - Math.exp(-CAM_LERP * dt));
+    const sh = fx.current.shake * 0.9;
+    if (sh > 0) camera.position.add(new THREE.Vector3((Math.random() - 0.5) * sh, (Math.random() - 0.5) * sh, (Math.random() - 0.5) * sh));
     camera.lookAt(px + Math.cos(a) * 3, 1.3 + p.z * S * 0.8, pz + Math.sin(a) * 3);
   }, -1);
   return null;
+}
+
+let actx: AudioContext | null = null;
+function playCrit() {
+  try {
+    actx ??= new AudioContext();
+    const t = actx.currentTime, o = actx.createOscillator(), n = actx.createOscillator(), gn = actx.createGain();
+    o.type = "square"; o.frequency.setValueAtTime(880, t); o.frequency.exponentialRampToValueAtTime(220, t + 0.18);
+    n.type = "sawtooth"; n.frequency.setValueAtTime(1320, t); n.frequency.exponentialRampToValueAtTime(440, t + 0.12);
+    gn.gain.setValueAtTime(0.18, t); gn.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    o.connect(gn); n.connect(gn); gn.connect(actx.destination);
+    o.start(t); n.start(t); o.stop(t + 0.22); n.stop(t + 0.22);
+  } catch { /* audio unavailable */ }
+}
+
+const MAX_T = 12;
+function FloatTexts({ game }: { game: MutableRefObject<Game> }) {
+  const groups = useRef<(THREE.Group | null)[]>([]), spans = useRef<(HTMLDivElement | null)[]>([]);
+  useFrame(() => {
+    const ts = game.current.texts;
+    for (let i = 0; i < MAX_T; i++) {
+      const g = groups.current[i], el = spans.current[i], t = ts[ts.length - 1 - i];
+      if (!g || !el) continue;
+      if (!t) { el.style.display = "none"; continue; }
+      el.style.display = "block";
+      const big = t.text === "CRIT!";
+      g.position.set(t.x * S, 2.6 + (0.9 - t.life) * 1.6 + (big ? 0.5 : 0), t.y * S);
+      el.textContent = t.text; el.style.color = t.color; el.style.opacity = String(Math.min(1, t.life * 2));
+      el.style.fontSize = big ? `${28 + (0.9 - t.life) * 10}px` : "18px";
+    }
+  });
+  return (
+    <>
+      {Array.from({ length: MAX_T }, (_, i) => (
+        <group key={i} ref={(el) => { groups.current[i] = el; }}>
+          <Html center zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
+            <div ref={(el) => { spans.current[i] = el; }} className="font-display text-outline whitespace-nowrap" style={{ display: "none" }} />
+          </Html>
+        </group>
+      ))}
+    </>
+  );
 }
 
 function Ground() {
@@ -275,6 +325,7 @@ export function Scene({ game, ctl, onReady }: { game: MutableRefObject<Game>; ct
       <Flag game={game} team="blue" />
       {Array.from({ length: n }, (_, i) => <Character key={i} game={game} idx={i} />)}
       <Particles game={game} />
+      <FloatTexts game={game} />
       <Ready onReady={onReady} />
     </>
   );
