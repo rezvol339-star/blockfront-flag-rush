@@ -39,11 +39,14 @@ export type ItemSlot = (typeof ITEMS)[number];
 export const PLACE_CD = 0.18, PLACE_DIST = 70;
 export type ShopItem = "sword" | "armor" | "blocks" | "potion" | "fireball" | "dynamite";
 
-export type Mode = "solo" | "ranked" | "training";
+export type Mode = "solo" | "duo" | "deathmatch" | "ranked" | "rankedSolo" | "training";
 export const MODES: Record<Mode, { label: string; red: number; blue: number; flags: boolean; time: number; skill: number; botDmg: number; startGold: number; fireballs: number }> = {
   solo: { label: "Solo Duel", red: 1, blue: 1, flags: true, time: 180, skill: 1.1, botDmg: 1, startGold: 0, fireballs: 1 },
   ranked: { label: "Ranked 3v3", red: 3, blue: 3, flags: true, time: ROUND_TIME, skill: 1.3, botDmg: 1, startGold: 0, fireballs: 1 },
   training: { label: "Training Arena", red: 1, blue: 3, flags: false, time: Infinity, skill: 1.2, botDmg: 0.5, startGold: 250, fireballs: 6 },
+  duo: { label: "2v2", red: 2, blue: 2, flags: true, time: ROUND_TIME, skill: 1.1, botDmg: 1, startGold: 0, fireballs: 1 },
+  deathmatch: { label: "Team Deathmatch", red: 3, blue: 3, flags: false, time: ROUND_TIME, skill: 1.1, botDmg: 1, startGold: 0, fireballs: 2 },
+  rankedSolo: { label: "Ranked Solo", red: 1, blue: 1, flags: true, time: 180, skill: 1.5, botDmg: 1, startGold: 0, fireballs: 1 },
 };
 
 export const BASES: Record<Team, { x: number; y: number }> = {

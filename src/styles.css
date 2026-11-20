@@ -103,6 +103,15 @@
   --team-blue: oklch(0.6 0.16 250);
   --gold: oklch(0.88 0.16 92);
   --panel: oklch(0.18 0.02 160 / 0.88);
+  --world-stone: oklch(0.69 0.02 145);
+  --world-dark-stone: oklch(0.43 0.02 155);
+  --world-light-stone: oklch(0.87 0.02 120);
+  --world-grass: oklch(0.65 0.12 140);
+  --world-leaf: oklch(0.5 0.13 148);
+  --world-wood: oklch(0.48 0.06 70);
+  --world-snow: oklch(0.96 0.015 220);
+  --world-sky: oklch(0.84 0.065 230);
+  --world-water: oklch(0.72 0.12 210);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -184,4 +193,7 @@
   .block-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--border); }
   .block-btn:disabled { opacity: 0.45; transform: none; }
   .text-outline { text-shadow: 0 3px 0 var(--border), 0 0 2px var(--border); }
+  .world-label { color: var(--foreground); background: var(--panel); border-bottom: 2px solid var(--gold); padding: 6px 12px; text-align: center; white-space: nowrap; border-radius: 4px; }
+  .world-toolbar { background: var(--panel); border: 1px solid var(--muted-foreground); border-radius: 6px; }
+  .world-title { font-family: var(--font-display); text-shadow: 0 2px 0 var(--border); }
 }

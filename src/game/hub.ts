@@ -1,12 +1,15 @@
 // Spawn hub simulation: plain TS, no React/DOM.
 import { SPEED, SPRINT, stepVertical, type Body, type Mode } from "./engine";
 
-export const HUB_R = 520;
+export const HUB_R = 1440;
 export const ENTER_R = 45, NEAR_R = 130;
 export const PORTALS: { mode: Mode; x: number; y: number; color: string; title: string; sub: string }[] = [
-  { mode: "solo", x: -300, y: -180, color: "#ffd84a", title: "Solo Duel", sub: "1v1 capture the flag" },
-  { mode: "ranked", x: 0, y: -330, color: "#ff7a2f", title: "Ranked 3v3", sub: "Tougher bots · earn rating" },
-  { mode: "training", x: 300, y: -180, color: "#3fd47a", title: "PvP Training", sub: "Practice combos & crits" },
+  { mode: "solo", x: -600, y: -520, color: "#ffd84a", title: "Solo (1v1)", sub: "Capture the flag" },
+  { mode: "duo", x: 0, y: -680, color: "#51c8e8", title: "2v2", sub: "Capture the flag" },
+  { mode: "deathmatch", x: 600, y: -520, color: "#ef685c", title: "Team Deathmatch", sub: "Elimination battle" },
+  { mode: "training", x: -720, y: 160, color: "#62d988", title: "Training Ground", sub: "Practice arena" },
+  { mode: "ranked", x: 720, y: 160, color: "#e9ac55", title: "Ranked 3v3", sub: "Advanced opponents" },
+  { mode: "rankedSolo", x: 0, y: 640, color: "#c3a0ed", title: "Ranked Solo", sub: "Expert duel" },
 ];
 
 export interface HubPlayer extends Body { angle: number }

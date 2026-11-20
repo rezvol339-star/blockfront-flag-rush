@@ -2,7 +2,7 @@ import { useMemo, useRef, type MutableRefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Billboard, Environment, Html, Lightformer } from "@react-three/drei";
 import * as THREE from "three";
-import { BASES, BASE_R, CELL, CIRCLE_R, CIRCLE_REACH, H, MINES, RADIUS, W, type Game, type Team } from "./engine";
+import { BASES, BASE_R, CELL, CIRCLE_R, CIRCLE_REACH, H, MINES, RADIUS, W, type Game, type Team, type ItemSlot } from "./engine";
 
 // 1 world unit = 1 grid cell (40 sim px). Sim (x, y) maps to world (x, z).
 export const S = 1 / CELL;
@@ -14,7 +14,7 @@ const CAM_DIST = 7, CAM_LERP = 12;
 
 export interface Controls { keys: Set<string>; yaw: number; pitch: number; attack: boolean; started: boolean;
   /** "circle": mouse moves a ground reticle (cf forward / cs sideways, sim px from player, camera-relative). */
-  mode: "crosshair" | "circle"; cf: number; cs: number }
+  mode: "crosshair" | "circle"; cf: number; cs: number; slot?: ItemSlot }
 export const circleWorld = (p: { x: number; y: number }, ctl: Controls) => ({
   x: p.x + Math.cos(ctl.yaw) * ctl.cf - Math.sin(ctl.yaw) * ctl.cs,
   y: p.y + Math.sin(ctl.yaw) * ctl.cf + Math.cos(ctl.yaw) * ctl.cs,
@@ -33,7 +33,8 @@ function Stepper({ game, ctl }: { game: MutableRefObject<Game>; ctl: Controls })
       const f = (k.has("w") || k.has("arrowup") ? 1 : 0) - (k.has("s") || k.has("arrowdown") ? 1 : 0);
       const r = (k.has("d") || k.has("arrowright") ? 1 : 0) - (k.has("a") || k.has("arrowleft") ? 1 : 0);
       const dx = Math.cos(a) * f - Math.sin(a) * r, dy = Math.sin(a) * f + Math.cos(a) * r;
-      g.step(dt, { dx, dy, aimX: p.x + Math.cos(a) * 100, aimY: p.y + Math.sin(a) * 100, attack: ctl.attack, circle: ctl.mode === "circle" ? { ...circleWorld(p, ctl), r: CIRCLE_R } : null, jump: k.has(" ") || k.has("space"), sprint: k.has("shift") });
+      if (ctl.attack && ctl.slot && ctl.slot !== "sword") g.useItem(p, ctl.slot, a);
+      g.step(dt, { dx, dy, aimX: p.x + Math.cos(a) * 100, aimY: p.y + Math.sin(a) * 100, attack: ctl.attack && (!ctl.slot || ctl.slot === "sword"), circle: ctl.mode === "circle" ? { ...circleWorld(p, ctl), r: CIRCLE_R } : null, jump: k.has(" ") || k.has("space"), sprint: k.has("shift") });
       for (const ev of g.events) {
         if (ev.type === "crit" && ev.player) { fx.current.stop = 0.08; fx.current.shake = 0.28; playCrit(); }
         else if (ev.type === "hit" && ev.player) fx.current.shake = Math.max(fx.current.shake, 0.08);
@@ -247,15 +248,15 @@ function Flag({ game, team }: { game: MutableRefObject<Game>; team: Team }) {
   return <group ref={ref}><FlagMesh team={team} /></group>;
 }
 
-function Character({ game, idx }: { game: MutableRefObject<Game>; idx: number }) {
+export function Character({ game, idx }: { game: MutableRefObject<Game>; idx: number }) {
   const root = useRef<THREE.Group>(null);
   const legL = useRef<THREE.Mesh>(null), legR = useRef<THREE.Mesh>(null);
   const armR = useRef<THREE.Group>(null), armL = useRef<THREE.Mesh>(null);
   const bodyMat = useRef<THREE.MeshStandardMaterial>(null), swordMat = useRef<THREE.MeshStandardMaterial>(null);
   const hpBar = useRef<THREE.Mesh>(null), hpMat = useRef<THREE.MeshBasicMaterial>(null);
   const last = useRef({ x: 0, y: 0, phase: 0 });
-  const e0 = game.current.ents[idx]!;
-  const teamCol = TEAM[e0.team];
+  const e0 = game.current.ents[idx];
+  const teamCol = e0 ? TEAM[e0.team] : TEAM.red;
   useFrame((_, delta) => {
     const e = game.current.ents[idx]; const r = root.current; if (!e || !r) return;
     r.visible = e.alive;
@@ -267,15 +268,17 @@ function Character({ game, idx }: { game: MutableRefObject<Game>; idx: number })
     const sw = Math.sin(last.current.phase) * 0.7;
     r.position.set(e.x * S, e.z * S, e.y * S);
     r.rotation.y = Math.PI / 2 - e.angle;
-    legL.current!.rotation.x = sw; legR.current!.rotation.x = -sw; armL.current!.rotation.x = -sw;
-    armR.current!.rotation.x = e.swingT > 0 ? -2.4 + (1 - e.swingT / 0.18) * 3 : -0.5 + sw * 0.4;
-    armR.current!.rotation.z = e.swingT > 0 ? -0.4 : 0;
+    const ll = legL.current, lr = legR.current, al = armL.current, ar = armR.current, bm = bodyMat.current, sm = swordMat.current, hb = hpBar.current, hm = hpMat.current;
+    if (!ll || !lr || !al || !ar || !bm || !sm || !hb || !hm) return;
+    ll.rotation.x = sw; lr.rotation.x = -sw; al.rotation.x = -sw;
+    ar.rotation.x = e.swingT > 0 ? -2.4 + (1 - e.swingT / 0.18) * 3 : -0.5 + sw * 0.4;
+    ar.rotation.z = e.swingT > 0 ? -0.4 : 0;
     const armor = ARMOR_COL[e.armor];
-    bodyMat.current!.color.set(e.hitFlash > 0 ? "#ff2a2a" : armor ?? teamCol);
-    swordMat.current!.color.set(SWORD_COL[e.sword]!);
+    bm.color.set(e.hitFlash > 0 ? "#ff2a2a" : armor ?? teamCol);
+    sm.color.set(SWORD_COL[e.sword] ?? SWORD_COL[0] ?? "#a8743a");
     const hp = Math.max(0, e.hp / 100);
-    hpBar.current!.scale.x = Math.max(0.001, hp); hpBar.current!.position.x = -(1 - hp) * 0.45;
-    hpMat.current!.color.set(hp > 0.5 ? "#5ee06a" : hp > 0.25 ? "#f2c23a" : "#ef4a3c");
+    hb.scale.x = Math.max(0.001, hp); hb.position.x = -(1 - hp) * 0.45;
+    hm.color.set(hp > 0.5 ? "#5ee06a" : hp > 0.25 ? "#f2c23a" : "#ef4a3c");
   });
   return (
     <group ref={root}>
@@ -296,7 +299,7 @@ function Character({ game, idx }: { game: MutableRefObject<Game>; idx: number })
       <Billboard position={[0, 2.55, 0]}>
         <mesh><planeGeometry args={[0.96, 0.14]} /><meshBasicMaterial color="#111111" /></mesh>
         <mesh ref={hpBar} position-z={0.01}><planeGeometry args={[0.9, 0.09]} /><meshBasicMaterial ref={hpMat} color="#5ee06a" /></mesh>
-        {e0.isPlayer && <mesh position-y={0.22}><planeGeometry args={[0.2, 0.2]} /><meshBasicMaterial color="#ffd84a" /></mesh>}
+        {e0?.isPlayer && <mesh position-y={0.22}><planeGeometry args={[0.2, 0.2]} /><meshBasicMaterial color="#ffd84a" /></mesh>}
       </Billboard>
     </group>
   );
@@ -332,10 +335,26 @@ export function Scene({ game, ctl, onReady }: { game: MutableRefObject<Game>; ct
       {Array.from({ length: n }, (_, i) => <Character key={i} game={game} idx={i} />)}
       <AimRing game={game} ctl={ctl} />
       <Particles game={game} />
+      <Projectiles game={game} />
       <FloatTexts game={game} />
       <Ready onReady={onReady} />
     </>
   );
+}
+
+function Projectiles({ game }: { game: MutableRefObject<Game> }) {
+  const ref = useRef<THREE.InstancedMesh>(null);
+  const temp = useMemo(() => ({ obj: new THREE.Object3D(), color: new THREE.Color() }), []);
+  useFrame(() => {
+    const mesh = ref.current; if (!mesh) return;
+    const fs = game.current.fireballs.slice(0, 50);
+    fs.forEach((fb, i) => {
+      temp.obj.position.set(fb.x * S, fb.z * S, fb.y * S); temp.obj.scale.setScalar(fb.kind === "tnt" ? 0.4 : 0.3); temp.obj.rotation.y += 0.06; temp.obj.updateMatrix();
+      mesh.setMatrixAt(i, temp.obj.matrix); mesh.setColorAt(i, temp.color.set(fb.kind === "tnt" ? TEAM.red : "#ffd84a"));
+    });
+    mesh.count = fs.length; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  });
+  return <instancedMesh ref={ref} args={[undefined, undefined, 50]} frustumCulled={false}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial emissive="#ff6d22" emissiveIntensity={0.5} /></instancedMesh>;
 }
 
 function AimRing({ game, ctl }: { game: MutableRefObject<Game>; ctl: Controls }) {
