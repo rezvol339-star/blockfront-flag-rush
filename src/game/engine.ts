@@ -165,7 +165,7 @@ export class Game {
 
   blockAt(cx: number, cy: number) { return this.blocks.get(k(cx, cy)); }
   blockH(b: Block) { return b.team ? TEAM_BLOCK_H : WALL_H; }
-  groundH(x: number, y: number) {
+  groundH(x: number, y: number): number {
     const b = this.blockAt(Math.floor(x / CELL), Math.floor(y / CELL));
     return b ? this.blockH(b) : 0;
   }
