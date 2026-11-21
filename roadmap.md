@@ -1,5 +1,6 @@
-# Wild World expansion
-- [ ] Build six protected hub entrances and merchant trading.
-- [ ] Add deterministic tall terrain, streamed exposed-face chunks, caves, wood and gold.
-- [ ] Connect mining, building, survival movement and return-to-hub with existing combat.
-- [ ] Test protection, resources, modes and survival; verify desktop and mobile rendering.
+# Spawn Hub integration
+- [ ] Start in the existing protected hub with clear spawn framing.
+- [ ] Connect six arena stations and a wilderness exploration entrance.
+- [ ] Connect the nearby merchant shop and resource trading.
+- [ ] Preserve terrain generation and session edits across mode changes.
+- [ ] Verify protection, transitions, purchases, rendering and clean compilation.

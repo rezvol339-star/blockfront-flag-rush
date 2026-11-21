@@ -1,7 +1,7 @@
 // Session-local, deterministic voxel survival. Coordinates: x/y horizontal, z vertical.
 import { createNoise2D } from "simplex-noise";
-import { AIR_DRAG, BHOP_DECAY, BHOP_MAX, BHOP_STEP, CELL, Game, GRAVITY, GROUND_DRAG, MAX_HP, RADIUS, SPEED, SPRINT, SWING_CD, stepVertical, type Ent, type Input } from "./engine";
-import { PORTALS } from "./hub";
+import { AIR_DRAG, BHOP_DECAY, BHOP_MAX, BHOP_STEP, CELL, Game, GROUND_DRAG, MAX_HP, RADIUS, SPEED, SPRINT, SWING_CD, stepVertical, type Ent, type Input, type ShopItem } from "./engine";
+import { PORTALS, SPAWN } from "./hub";
 
 export const CHUNK = 16, SAFE_RADIUS = 36, WORLD_BOTTOM = -192, WORLD_TOP = 384;
 export const MERCHANT = { x: -9, y: 8 }, INTERACT_RANGE = 5;
@@ -46,8 +46,8 @@ export class WildWorld extends Game {
   }
   home() {
     const p = this.player;
-    Object.assign(p, { x: 0, y: 440, z: 0, vz: 0, grounded: true, alive: true, hp: MAX_HP, kbx: 0, kby: 0 });
-    this.peak = 0; this.message = "Sanctuary · Protected";
+    Object.assign(p, { x: SPAWN.x, y: SPAWN.y, z: 0, vz: 0, grounded: true, alive: true, hp: MAX_HP, kbx: 0, kby: 0, bhop: 1, angle: SPAWN.yaw, swingT: 0, swingCd: 0 });
+    this.peak = 0; this.target = null; this.actionCd = 0; this.message = "Sanctuary · Protected";
   }
   intervals(x: number, y: number): Interval[] {
     const h = height(x, y);
@@ -148,6 +148,10 @@ export class WildWorld extends Game {
     this.edit(x, y, z, "stone"); p.blocks--; this.actionCd = 0.2; this.message = "Block placed"; return true;
   }
   nearMerchant() { return Math.hypot(this.player.x / CELL - MERCHANT.x, this.player.y / CELL - MERCHANT.y) < INTERACT_RANGE; }
+  override buy(e: Ent, item: ShopItem): boolean {
+    if (e !== this.player || !e.alive || !this.nearMerchant()) return false;
+    return item === "blocks" ? this.buyBlocks() : super.buy(e, item);
+  }
   trade(resource: Resource): boolean {
     if (!this.nearMerchant() || this.resources[resource] < 1) return false;
     const count = this.resources[resource]; this.resources[resource] = 0; this.player.gold += count * TRADE[resource]; this.message = `Traded ${count} ${resource}`; return true;

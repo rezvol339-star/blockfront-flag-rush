@@ -33,3 +33,4 @@ use the editor.
 - World generation, edits, survival and protection live in world.ts; WorldScene.tsx builds exposed-face chunk meshes from the same column intervals used for collisions, so mining and rendering agree.
 - The hub and wilderness are a session-only local simulation; arenas use the existing bot combat engine, not online matchmaking, to preserve combat without implying a network service.
 - Development builds expose window.__game state, warp, sim, enter and home plus data-scene-ready, so full world and arena flows can be checked at software-renderer speed.
+- GameSession owns one retained WildWorld and separate disposable bot arenas; GameView switches scene content inside one Canvas, so returning home preserves terrain edits and trading inventory without restarting the renderer.

@@ -196,4 +196,8 @@
   .world-label { color: var(--foreground); background: var(--panel); border-bottom: 2px solid var(--gold); padding: 6px 12px; text-align: center; white-space: nowrap; border-radius: 4px; }
   .world-toolbar { background: var(--panel); border: 1px solid var(--muted-foreground); border-radius: 6px; }
   .world-title { font-family: var(--font-display); text-shadow: 0 2px 0 var(--border); }
+  .game-health { display: block; border-radius: 2px; background: var(--muted); }
+  .game-health::-webkit-meter-bar { border: 0; background: var(--muted); }
+  .game-health::-webkit-meter-optimum-value { background: var(--team-red); }
+  .game-health::-moz-meter-bar { background: var(--team-red); }
 }

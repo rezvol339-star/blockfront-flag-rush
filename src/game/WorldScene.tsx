@@ -4,7 +4,7 @@ import { Environment, Html, Lightformer } from "@react-three/drei";
 import * as THREE from "three";
 import { CELL, type Game } from "./engine";
 import { Character, type Controls } from "./Scene";
-import { PORTALS } from "./hub";
+import { HUB_STATIONS, SPAWN } from "./hub";
 import { CHUNK, MERCHANT, SAFE_RADIUS, WildWorld, type Interval, type Voxel } from "./world";
 import { stoneTexture, worldPalette, type WorldColor } from "./world-palette";
 
@@ -39,7 +39,7 @@ function hubCubes(): Cube[] {
   for (const x of [-8, 8]) for (const z of [-8, 8]) {
     box(x, z, 0.05, 3.8, 3.8, 0.25, "light"); box(x, z, 0.3, 3.1, 3.1, 0.12, "water"); box(x, z, 0.42, 0.7, 0.7, 1.6, "stone"); box(x, z, 2.02, 1.4, 1.4, 0.2, "water");
   }
-  PORTALS.forEach((p, i) => {
+  HUB_STATIONS.forEach((p, i) => {
     const x = p.x / CELL, z = p.y / CELL, accent: WorldColor = i === 0 || i > 3 ? "gold" : i === 1 ? "blue" : i === 2 ? "red" : "leaf";
     box(x, z, 0.05, 4.5, 4.5, 0.25, "dark"); box(x, z, 0.3, 3.5, 3.5, 0.45, "light"); box(x, z, 0.75, 2.6, 2.6, 0.4, accent);
     // Deliberately sculpted voxel knight statues, on individual plinths.
@@ -55,6 +55,9 @@ function hubCubes(): Cube[] {
   for (const dx of [-2, 2]) box(mx + dx, mz, 0.16, 0.3, 0.3, 3.1, "wood");
   for (let dx = -2; dx <= 2; dx += 0.5) box(mx + dx, mz, 3.25, 0.5, 3.3, 0.2, dx % 1 === 0 ? "leaf" : "light");
   box(mx, mz - 0.5, 0.2, 0.65, 0.5, 1.1, "leaf"); box(mx, mz - 0.5, 1.3, 0.6, 0.6, 0.6, "light");
+  // Eyes and a cap make the voxel vendor readable at interaction distance.
+  box(mx - 0.14, mz - 0.19, 1.62, 0.1, 0.03, 0.1, "dark"); box(mx + 0.14, mz - 0.19, 1.62, 0.1, 0.03, 0.1, "dark");
+  box(mx, mz - 0.5, 1.9, 0.8, 0.75, 0.18, "gold");
   for (let i = 0; i < 3; i++) box(mx - 1.5 + i * 1.5, mz + 0.6, 1.36, 0.6, 0.6, 0.5, i === 0 ? "wood" : i === 1 ? "stone" : "gold");
   return list;
 }
@@ -68,8 +71,9 @@ function HubArchitecture({ palette, texture }: { palette: Palette; texture: THRE
   }, [cubes, palette]);
   return <>
     <instancedMesh ref={mesh} args={[undefined, undefined, cubes.length]} receiveShadow castShadow frustumCulled={false}><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial map={texture} roughness={0.85} /></instancedMesh>
-    {PORTALS.map((pt) => <Html key={pt.mode} center position={[pt.x / CELL, 6.4, pt.y / CELL]} distanceFactor={24} zIndexRange={[15, 0]} occlude><div className="world-label font-display"><div className="text-lg">{pt.title}</div><div className="font-sans text-[10px] text-muted-foreground">{pt.sub}</div></div></Html>)}
+    {HUB_STATIONS.map((pt) => <Html key={pt.mode} center position={[pt.x / CELL, 6.4, pt.y / CELL]} distanceFactor={24} zIndexRange={[15, 0]} occlude><div className="world-label font-display"><div className="text-lg">{pt.title}</div><div className="font-sans text-[10px] text-muted-foreground">{pt.sub}</div></div></Html>)}
     <Html center position={[MERCHANT.x, 4, MERCHANT.y]} distanceFactor={20} zIndexRange={[15, 0]}><div className="world-label font-display text-lg">Hub Merchant</div></Html>
+    <mesh rotation-x={-Math.PI / 2} position={[SPAWN.x / CELL, 0.025, SPAWN.y / CELL]}><ringGeometry args={[1.6, 1.9, 32]} /><meshBasicMaterial color={palette.gold} /></mesh>
   </>;
 }
 
@@ -147,7 +151,7 @@ function Terrain({ world, palette, texture }: { world: WildWorld; palette: Palet
 }
 function WorldStepper({ world, ctl, onReady }: { world: WildWorld; ctl: Controls; onReady: () => void }) {
   const { camera, gl } = useThree();
-  const target = useMemo(() => new THREE.Vector3(), []), done = useRef(false);
+  const target = useMemo(() => new THREE.Vector3(), []), look = useMemo(() => new THREE.Vector3(), []), sample = useMemo(() => new THREE.Vector3(), []), done = useRef(false);
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05), p = world.player, a = ctl.yaw, keys = ctl.keys;
     if (ctl.started) {
@@ -161,10 +165,10 @@ function WorldStepper({ world, ctl, onReady }: { world: WildWorld; ctl: Controls
     const distance = 9;
     target.set(px - Math.cos(a) * distance * Math.cos(ctl.pitch), py + 2 + distance * Math.sin(ctl.pitch), pz - Math.sin(a) * distance * Math.cos(ctl.pitch));
     // Pull the camera in when a cave wall would hide the player.
-    const look = new THREE.Vector3(px, py + 1.6, pz);
+    look.set(px, py + 1.6, pz);
     for (let t = 0.2; t < 1; t += 0.1) {
-      const sample = look.clone().lerp(target, t);
-      if (world.voxel(Math.floor(sample.x), Math.floor(sample.z), Math.floor(sample.y))) { target.copy(look.clone().lerp(target, Math.max(0.1, t - 0.1))); break; }
+      sample.copy(look).lerp(target, t);
+      if (world.voxel(Math.floor(sample.x), Math.floor(sample.z), Math.floor(sample.y))) { target.copy(sample.copy(look).lerp(target, Math.max(0.1, t - 0.1))); break; }
     }
     camera.position.lerp(target, done.current ? 1 - Math.exp(-12 * dt) : 1);
     camera.lookAt(px + Math.cos(a) * 4, py + 1.6, pz + Math.sin(a) * 4);
